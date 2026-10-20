@@ -2,6 +2,20 @@ classDiagram
     %% Initial design from the Phase 1 brainstorm in reflection.md.
     %% Keep this file updated so it matches your final implementation.
 
+    class Priority {
+        <<enumeration>>
+        LOW = 1
+        MEDIUM = 2
+        HIGH = 3
+    }
+
+    class Frequency {
+        <<enumeration>>
+        ONCE
+        DAILY
+        WEEKLY
+    }
+
     class Owner {
         +str name
         +str sex
@@ -16,31 +30,47 @@ classDiagram
         +str sex
         +str species
         +str breed
-        +int age
         +float weight
         +date birthday
-        +str owner_name
+        +Owner owner
+        +age() int
     }
 
     class Task {
         +str title
         +int duration
-        +str priority
-        +bool done
+        +Priority priority
         +Pet pet
-        +mark_done() None
-        +reschedule(new_time) None
+        +Frequency frequency
+        +datetime start_time
+        +date last_done
+        +mark_done(on: date) None
+        +is_due(on: date) bool
+        +reschedule(new_time: datetime) None
+        +end_time() datetime
+        +overlaps(other: Task) bool
     }
 
     class Schedule {
+        +Owner owner
+        +date day
+        +int available_minutes
         +list~Task~ tasks
+        +list~str~ reasons
         +add_task(task: Task) None
         +remove_task(task: Task) None
         +get_pending_tasks() list~Task~
         +get_tasks_for_pet(pet: Pet) list~Task~
-        +display_schedule() None
+        +generate_plan(start: time) list~Task~
+        +find_conflicts() list~tuple~
+        +explain_plan() list~str~
+        +display_schedule() str
     }
 
     Owner "1" o-- "0..*" Pet : owns
+    Pet "0..*" --> "1" Owner : belongs to
+    Schedule "0..*" --> "1" Owner : plans for
     Schedule "1" o-- "0..*" Task : contains
     Task "0..*" --> "1" Pet : assigned to
+    Task --> Priority : uses
+    Task --> Frequency : uses

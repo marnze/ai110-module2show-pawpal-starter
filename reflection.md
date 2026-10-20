@@ -25,12 +25,21 @@ Main objects needed for this system:
     - methods: add_task, remove_task, get_pending_tasks (tasks where done is False), get_tasks_for_pet (returns tasks assigned to specific Pet), display_schedule (some kind of clean way to display the schedule of tasks for the day)
 
 - Briefly describe your initial UML design.
+
+    I identified and implemented the four basic core classes Owner, Pet, Task, and Schedule into the initial UML design. Owner, Pet, Task, and Schedule. Owner can own many Pets. Each Pet has 1 Owner. Many Tasks can be assigned to a Pet. A Pet can have many tasks. A Schedule can contain many Tasks, and a Task is assigned to a Schedule.
 - What classes did you include, and what responsibilities did you assign to each?
+
+    Owner, Pet, Task, Schedule. Owner holds basic contact infor for the pet owner, has a list of Pets, and can add a Pet to their list. A Pet contains basic Pet info and the name of their Owner. A Task has basic info such as duration, priority, and Pet associated with it, and can mark itself done or reschedule its time. A Schedule has a list of Tasks and can add/remove Tasks, get a list of pending Tasks, get Tasks for a specific Pet, and display a schedule of Tasks.
+
 
 **b. Design changes**
 
 - Did your design change during implementation?
+
+    Yes
 - If yes, describe at least one change and why you made it.
+
+    AI identified that a Pet does not point to its Owner, it only had a owner_name string but no Owner object. A Pet's owner_name: str is now owner: Owner. Schedule class was greatly expanded to now have an owner, a day, and available_minutes. generate_plan() was added to sort tasks by priority and fit them in available times. explain_plan() records why each task was kept or skipped.
 
 ---
 
