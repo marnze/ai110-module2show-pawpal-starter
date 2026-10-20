@@ -42,16 +42,37 @@ pip install -r requirements.txt
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
 
+## 🧩 Implementation Summary
+
+The scheduling logic lives in `pawpal_system.py` and is built from four classes plus two enums:
+
+- **`Owner`** holds contact info and a list of `Pet`s. `add_pet()` links each pet back to its owner, and `get_all_tasks()` gathers every task across all pets.
+- **`Pet`** stores profile details (species, breed, weight, birthday; `age` is computed from the birthday) and its own list of `Task`s. `add_task()` links each task back to its pet and stops one task from belonging to two pets.
+- **`Task`** is a single care item: title, duration in minutes, `Priority` (LOW/MEDIUM/HIGH) and `Frequency` (ONCE/DAILY/WEEKLY). It records `last_done` instead of a done flag, so `is_due()` can tell whether a repeating task needs doing again. Once a task is scheduled it has a `start_time`, and `overlaps()` checks whether it clashes with another task.
+- **`Scheduler`** plans one day for one owner within a time budget (`available_minutes`). `generate_plan()` gets the pending tasks and sorts them by priority (highest first, shorter task wins a tie). It then gives each task that still fits the next free time slot and skips any task that doesn't. It records a reason for every task it schedules or skips. `explain_plan()` returns those reasons, `find_conflicts()` reports overlaps caused by manual `reschedule()` calls, and `display_schedule()` formats the day as text.
+
+The flow goes **Owner → Pets → Tasks**, and the **Scheduler** reads that structure through the owner to build the day's plan and explain it.
+
 ## 🖥️ Sample Output
 
 Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
 
 ```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
+==================================================
+Today's Schedule
+==================================================
+Schedule for Mauricio on Tuesday, October 20:
+  07:00-07:05  Breakfast (Luna) [HIGH, pending]
+  07:05-07:35  Morning walk (Mochi) [HIGH, pending]
+  07:35-07:45  Brush teeth (Mochi) [MEDIUM, pending]
+  07:45-08:00  Clean litter box (Luna) [MEDIUM, pending]
+
+Why this plan:
+  - Scheduled 'Breakfast' for Luna at 07:00: HIGH priority, 5 min fits (115 min left).
+  - Scheduled 'Morning walk' for Mochi at 07:05: HIGH priority, 30 min fits (85 min left).
+  - Scheduled 'Brush teeth' for Mochi at 07:35: MEDIUM priority, 10 min fits (75 min left).
+  - Scheduled 'Clean litter box' for Luna at 07:45: MEDIUM priority, 15 min fits (60 min left).
+  - Skipped 'Vet checkup' for Luna: needs 90 min but only 60 min left.
 ```
 
 ## 🧪 Testing PawPal+

@@ -62,12 +62,20 @@ Main objects needed for this system:
 **a. How you used AI**
 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
+
+    I used AI for every stage of the project. For design, I had it review my class skeletons against the UML. That review found the missing Pet -> Owner link (owner_name was just a string) and suggested replacing the done flag with last_done plus a Frequency enum so recurring tasks would work. For refactoring, it helped me turn priority from a plain string into a Priority IntEnum so tasks sort correctly, and it made age a computed property so it never goes stale. It also helped me implement generate_plan() and write the tests.
 - What kinds of prompts or questions were most helpful?
+
+    The most helpful prompts asked AI to review something specific, for example "review these skeletons against my UML and point out problems", instead of asking it to build everything from scratch in a single prompt. Keeping each logical task in its own chat window also helped in organizing myself and not being overwhelmed by everything being done in a single window.
 
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
+
+    AI wanted to change the mark_done() method to mark_complete() to better match the project instructions but I ignored its suggestion as every student's UML will slightly vary with naming which is okay if the implementation fulfills the project requirements.
 - How did you evaluate or verify what the AI suggested?
+
+    I checked suggestions against my UML and the project requirements before accepting them, and I made sure each change still fit how the classes connect. For the logic, I verified behavior by running main.py to see a real generated schedule with its explanations and by running pytest tests manually. If I had any questions, I asked AI to explain itself and its changes.
 
 ---
 
