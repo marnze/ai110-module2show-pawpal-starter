@@ -53,6 +53,19 @@ The scheduling logic lives in `pawpal_system.py` and is built from four classes 
 
 The flow goes **Owner → Pets → Tasks**, and the **Scheduler** reads that structure through the owner to build the day's plan and explain it.
 
+## ✨ Features
+
+- **Priority-first planning:** `generate_plan()` puts the most important tasks first (HIGH → LOW). When two tasks have the same priority, the shorter one goes first, so more tasks fit.
+- **Time-budget fitting:** Tasks are added one after another until the owner's available minutes run out. A task that doesn't fit is skipped, but the planner keeps checking the rest, because a shorter task later in the list may still fit.
+- **Working around finished tasks:** When the plan is rebuilt, tasks already done today keep their time slots. New tasks fill the gaps between them (`_next_free_slot()`), so replanning never creates overlaps.
+- **Sorting by time:** `sort_by_time()` lists tasks earliest first, with unscheduled tasks at the end. Tasks with the same start time keep the order they were added in.
+- **Filtering:** `filter_tasks()` narrows the list by pet name (case-insensitive), by status (done / due today), or both.
+- **Conflict warnings:** `find_conflicts()` finds tasks whose time slots overlap, for the same pet or different pets. Because the tasks are sorted by time first, each task is only compared with the ones that start before it ends. Back-to-back tasks are not conflicts. `conflict_warnings()` turns each overlap into a readable message instead of raising an error.
+- **Daily and weekly recurrence:** Marking a DAILY or WEEKLY task done creates the next one, due 1 or 7 days later at the same time of day. Marking a task done twice never creates a duplicate, and ONCE tasks don't repeat.
+- **Due dates:** A task is due once its `due_date` arrives and stays due until it's done, so an overdue task is never dropped. Future occurrences stay hidden until their day.
+- **Plan explanations:** Every scheduled or skipped task gets a reason (priority, minutes used, minutes left), which `explain_plan()` returns.
+- **Data checks:** A pet or task can't belong to two owners or pets. Durations must be positive whole minutes, and the time budget can't be negative.
+
 ## 🖥️ Sample Output
 
 Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
@@ -162,12 +175,87 @@ ONCE tasks return `None`, and marking a task done twice never creates a duplicat
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+Run the app with `streamlit run app.py`.
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+### Main UI features
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+| Section | What you can do |
+|---------|-----------------|
+| **Owner** | Enter the owner's name and contact info. |
+| **Add a Pet** | Add a pet with name, species, breed, sex, weight and birthday. A table lists every pet with its age and task count. |
+| **Add a Task** | Give a pet a task with a title, duration, priority and frequency (once, daily or weekly). The task table can be filtered by pet and by status (All / Due today / Done) and is sorted by time. |
+| **Build Schedule** | Pick the day, a start time and how many minutes you have, then click **Generate schedule**. |
+| **Schedule results** | A green banner if there are no conflicts or a yellow warning if there are, three summary numbers (tasks, planned minutes, minutes free), the schedule table, a list of tasks that didn't fit, and a "Why this plan?" section. |
+| **Move a task to a fixed time** | Set a task to a specific time, such as a vet appointment. |
+
+### Example workflow
+
+1. Enter your name in the **Owner** section.
+2. Add two pets, for example **Mochi** (dog) and **Luna** (cat).
+3. Add tasks: *Morning walk* for Mochi (30 min, High, Daily), *Breakfast* for Luna (5 min, High, Daily), *Brush teeth* for Mochi (10 min, Medium) and *Vet checkup* for Luna (90 min, Low).
+4. Set the task filter to **Luna** to see only her tasks, then back to **All pets**.
+5. In **Build Schedule**, set the start time to 07:00 and available minutes to 60, then click **Generate schedule**.
+6. Read the result:
+   - The two High-priority tasks come first, with the shorter *Breakfast* ahead of *Morning walk*.
+   - *Brush teeth* fills the next slot.
+   - *Vet checkup* is listed under "Didn't fit today" because only 15 minutes are left.
+   - The green banner confirms there are no conflicts.
+7. Open **Move a task to a fixed time** and move *Brush teeth* to 07:10. A yellow warning appears above the table. It names both overlapping tasks, their pets and time slots, and suggests a time that frees up the slot. The rows involved are marked ⚠️ in the table.
+8. Click **Generate schedule** again to replace the manual time and clear the conflict.
+
+### Scheduler behaviors shown
+
+- **Priority sorting with a tie-breaker:** highest priority first, then the shorter task first (step 6).
+- **Time-budget fitting:** a task that doesn't fit is skipped and explained, and the rest are still scheduled (step 6).
+- **Filtering and sorting by time:** the task table uses `filter_tasks()` and `sort_by_time()` (step 4).
+- **Conflict warnings:** `find_conflicts()` catches the overlap after a manual move (step 7).
+- **Plan explanations:** "Why this plan?" shows the reasons from `explain_plan()` (step 6).
+
+### Sample CLI output
+
+`python main.py` builds a sample owner with two pets. It marks two daily tasks done, sorts and filters the task list, checks for conflicts, and generates the day's plan. Here is part of its output:
+
+```
+Sorted by time
+--------------------------------------------------
+  Tue 07:00  Morning walk       Mochi  [done]
+  Tue 07:45  Breakfast          Luna   [done]
+  Tue 12:30  Clean litter box   Luna   [pending]
+  Tue 18:00  Evening walk       Mochi  [pending]
+  Tue 18:00  Dinner             Luna   [pending]
+  Tue 21:00  Brush teeth        Mochi  [pending]
+  Tue 21:00  Medication         Mochi  [pending]
+  Wed 07:00  Morning walk       Mochi  [pending] due Wed 10/21
+  Wed 07:45  Breakfast          Luna   [pending] due Wed 10/21
+  --- --:--  Vet checkup        Luna   [pending]
+
+Conflict check
+--------------------------------------------------
+  WARNING: 'Evening walk' (18:00-18:30) overlaps 'Dinner' (18:00-18:10), Mochi and Luna.
+  WARNING: 'Brush teeth' (21:00-21:10) overlaps 'Medication' (21:00-21:05), both for Mochi.
+
+==================================================
+Today's Schedule
+==================================================
+Schedule for Mauricio on Tuesday, October 20:
+  07:00-07:30  Morning walk (Mochi) [HIGH, done]
+  07:45-07:50  Breakfast (Luna) [HIGH, done]
+  08:00-08:05  Medication (Mochi) [HIGH, pending]
+  08:05-08:15  Dinner (Luna) [HIGH, pending]
+  08:15-08:45  Evening walk (Mochi) [HIGH, pending]
+  08:45-08:55  Brush teeth (Mochi) [MEDIUM, pending]
+  08:55-09:10  Clean litter box (Luna) [MEDIUM, pending]
+
+Why this plan:
+  - Scheduled 'Medication' for Mochi at 08:00: HIGH priority, 5 min fits (115 min left).
+  - Scheduled 'Dinner' for Luna at 08:05: HIGH priority, 10 min fits (105 min left).
+  - Scheduled 'Evening walk' for Mochi at 08:15: HIGH priority, 30 min fits (75 min left).
+  - Scheduled 'Brush teeth' for Mochi at 08:45: MEDIUM priority, 10 min fits (65 min left).
+  - Scheduled 'Clean litter box' for Luna at 08:55: MEDIUM priority, 15 min fits (50 min left).
+  - Skipped 'Vet checkup' for Luna: needs 90 min but only 50 min left.
+```
+
+In this output:
+- Tomorrow's *Morning walk* and *Breakfast* were created automatically when today's were marked done.
+- The two conflicts come from fixed times set in the demo.
+- The plan skips the finished 07:00 and 07:45 tasks and starts the remaining ones at 08:00, so nothing overlaps.

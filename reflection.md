@@ -115,10 +115,15 @@ Main objects needed for this system:
 
 - What part of this project are you most satisfied with?
 
+    I'm most satisfied that the scheduler explains itself and that the tests back it up. Every task generate_plan() schedules or skips gets a reason, so the owner never has to guess why "Vet checkup" didn't make it into the day. The same reasons show up in main.py and in the "Why this plan?" section of the Streamlit app. 
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
 
+    First, I'd make the Streamlit app do everything the backend can. Right now you can't mark a task done, edit it, or delete it from the UI, so recurring tasks only show up in main.py and the tests. Second, I'd add owner preferences, which the scenario mentions but I didn't build. For example, a task could have a preferred time window like "walks in the morning" or "meds at 9:00," and the planner would try to place it there. Third, I'd save pets and tasks to a file so they survive a page refresh, because session_state is lost when the browser tab closes. Finally, I'd settle the open design questions from my testing section: plans that run past midnight, and whether finished tasks should use up the day's available minutes.
+
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+
+    The UML is just a starting point. My first design had Schedule holding its own list of tasks, but once I started building, it made more sense for each Pet to own its tasks and for the Scheduler to read them through the Owner. Updating the diagram at the end showed how much the design changed. I also learned that AI is most useful as a reviewer when I give it something specific to check, like my skeletons against my UML, and less useful when I ask it to build everything at once. Either way, I still have to verify its work. The tests and running the app myself were how I knew the code actually did what the AI said it did.

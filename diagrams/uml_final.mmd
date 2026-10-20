@@ -1,0 +1,97 @@
+classDiagram
+    %% Final design, matching pawpal_system.py.
+    %% Changes from uml.mmd:
+    %%   - Schedule renamed to Scheduler; it no longer stores its own task list.
+    %%     Tasks live on each Pet, and Scheduler reads them through Owner.
+    %%   - Pet gained tasks + add_task/remove_task; Owner gained get_all_tasks.
+    %%   - Task gained due_date and is_done; mark_done() now creates the next
+    %%     DAILY/WEEKLY occurrence and returns it (or None).
+    %%   - Scheduler gained sort_by_time, filter_tasks, get_scheduled_tasks,
+    %%     conflict_warnings, and the private helper _next_free_slot.
+    %%   - pet/owner back-references are 0..1: they are None until the object
+    %%     is added through Pet.add_task() / Owner.add_pet().
+
+    class Priority {
+        <<enumeration>>
+        LOW = 1
+        MEDIUM = 2
+        HIGH = 3
+    }
+
+    class Frequency {
+        <<enumeration>>
+        ONCE
+        DAILY
+        WEEKLY
+    }
+
+    class Owner {
+        +str name
+        +str sex
+        +str contact_info
+        +list~Pet~ pets
+        +add_pet(pet: Pet) None
+        +list_pets() list~Pet~
+        +get_all_tasks() list~Task~
+    }
+
+    class Pet {
+        +str name
+        +str sex
+        +str species
+        +str breed
+        +float weight
+        +date birthday
+        +list~Task~ tasks
+        +Owner owner
+        +age() int
+        +add_task(task: Task) None
+        +remove_task(task: Task) None
+    }
+
+    class Task {
+        +str title
+        +int duration
+        +Priority priority
+        +Frequency frequency
+        +datetime start_time
+        +date last_done
+        +date due_date
+        +Pet pet
+        +is_done() bool
+        +mark_done(on: date) Task
+        +is_due(on: date) bool
+        +reschedule(new_time: datetime) None
+        +end_time() datetime
+        +overlaps(other: Task) bool
+    }
+
+    class Scheduler {
+        +Owner owner
+        +date day
+        +int available_minutes
+        +list~str~ reasons
+        +add_task(pet: Pet, task: Task) None
+        +remove_task(task: Task) None
+        +get_pending_tasks() list~Task~
+        +get_tasks_for_pet(pet: Pet) list~Task~
+        +sort_by_time(tasks: list~Task~) list~Task~
+        +filter_tasks(pet_name: str, done: bool) list~Task~
+        +get_scheduled_tasks() list~Task~
+        +generate_plan(start: time) list~Task~
+        -_next_free_slot(start: datetime, minutes: int, busy: list~Task~)$ datetime
+        +find_conflicts() list~tuple~
+        +conflict_warnings() list~str~
+        +explain_plan() list~str~
+        +display_schedule() str
+    }
+
+    Owner "1" o-- "0..*" Pet : owns
+    Pet "0..*" --> "0..1" Owner : belongs to
+    Pet "1" *-- "0..*" Task : has
+    Task "0..*" --> "0..1" Pet : assigned to
+    Scheduler "0..*" --> "1" Owner : plans for
+    Scheduler ..> Task : orders, filters, checks conflicts
+    Task ..> Task : next occurrence
+    Task --> Priority : uses
+    Task --> Frequency : uses

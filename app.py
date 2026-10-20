@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, datetime, time
 
 import streamlit as st
 
@@ -121,20 +121,37 @@ else:
             )
             st.success(f"Added '{task_title}' for {pet.name}.")
 
-    all_tasks = owner.get_all_tasks()
-    if all_tasks:
-        st.table(
-            [
-                {
-                    "Pet": t.pet.name,
-                    "Task": t.title,
-                    "Minutes": t.duration,
-                    "Priority": t.priority.name.title(),
-                    "Frequency": t.frequency.value.title(),
-                }
-                for t in all_tasks
-            ]
+    if owner.get_all_tasks():
+        # Filtering only needs the day, not a time budget.
+        view = Scheduler(owner=owner, day=date.today(), available_minutes=0)
+        col1, col2 = st.columns(2)
+        with col1:
+            pet_filter = st.selectbox("Show pet", ["All pets"] + sorted({p.name for p in owner.pets}))
+        with col2:
+            status_filter = st.selectbox("Show status", ["All", "Due today", "Done"])
+        tasks = view.sort_by_time(
+            view.filter_tasks(
+                pet_name=None if pet_filter == "All pets" else pet_filter,
+                done={"All": None, "Due today": False, "Done": True}[status_filter],
+            )
         )
+        if tasks:
+            st.table(
+                [
+                    {
+                        "Time": f"{t.start_time:%H:%M}" if t.start_time else "—",
+                        "Pet": t.pet.name,
+                        "Task": t.title,
+                        "Minutes": t.duration,
+                        "Priority": t.priority.name.title(),
+                        "Frequency": t.frequency.value.title(),
+                        "Status": "✅ Done" if t.is_done else ("Due" if t.is_due(view.day) else "Upcoming"),
+                    }
+                    for t in tasks
+                ]
+            )
+        else:
+            st.info("No tasks match these filters.")
     else:
         st.info("No tasks yet. Add one above.")
 
@@ -149,28 +166,82 @@ with col2:
 with col3:
     available = st.number_input("Available minutes", min_value=0, max_value=1440, value=120)
 
-if st.button("Generate schedule"):
-    scheduler = Scheduler(owner=owner, day=plan_day, available_minutes=int(available))
-    plan = scheduler.generate_plan(start_at)
-    if plan:
-        st.table(
-            [
-                {
-                    "Start": f"{t.start_time:%H:%M}",
-                    "End": f"{t.end_time():%H:%M}",
-                    "Pet": t.pet.name,
-                    "Task": t.title,
-                    "Priority": t.priority.name.title(),
-                }
-                for t in plan
-            ]
-        )
+scheduler = Scheduler(owner=owner, day=plan_day, available_minutes=int(available))
+if st.button("Generate schedule", type="primary"):
+    scheduler.generate_plan(start_at)
+    # Start times live on the tasks, but the reasons only live on this
+    # Scheduler, so keep them for the reruns that follow.
+    st.session_state.plan_reasons = (plan_day, scheduler.explain_plan())
+
+# Render from the tasks themselves so the schedule survives reruns
+# (changing a filter, moving a task, etc.).
+scheduled = scheduler.get_scheduled_tasks()
+if not scheduled:
+    st.info(f"Nothing scheduled for {plan_day:%A, %B %d} yet. Click **Generate schedule**.")
+else:
+    conflicts = scheduler.find_conflicts()
+    if conflicts:
+        lines = [
+            f"**⚠️ {len(conflicts)} time conflict{'s' if len(conflicts) > 1 else ''}** — "
+            "you can't be in two places at once:"
+        ]
+        for a, b in conflicts:
+            lines.append(
+                f"- **{a.title}** for {a.pet.name} ({a.start_time:%H:%M}–{a.end_time():%H:%M}) overlaps "
+                f"**{b.title}** for {b.pet.name} ({b.start_time:%H:%M}–{b.end_time():%H:%M}). "
+                f"Try moving *{b.title}* to {a.end_time():%H:%M} or later."
+            )
+        st.warning("\n".join(lines))
     else:
-        st.warning("Nothing could be scheduled. Add tasks or increase the available minutes.")
+        st.success(f"✅ {len(scheduled)} task(s) planned for {plan_day:%A, %B %d} with no time conflicts.")
 
-    with st.expander("Why this plan?", expanded=True):
-        for reason in scheduler.explain_plan():
-            st.markdown(f"- {reason}")
+    planned = sum(t.duration for t in scheduled)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Tasks", len(scheduled))
+    col2.metric("Planned minutes", planned)
+    col3.metric("Minutes free", int(available) - planned)
 
-    for a, b in scheduler.find_conflicts():
-        st.error(f"Conflict: '{a.title}' overlaps '{b.title}'.")
+    conflicting = {t for pair in conflicts for t in pair}
+    st.table(
+        [
+            {
+                "": "⚠️" if t in conflicting else "",
+                "Start": f"{t.start_time:%H:%M}",
+                "End": f"{t.end_time():%H:%M}",
+                "Pet": t.pet.name,
+                "Task": t.title,
+                "Priority": t.priority.name.title(),
+                "Status": "✅ Done" if t.is_done else "Pending",
+            }
+            for t in scheduled
+        ]
+    )
+
+    skipped = [t for t in scheduler.get_pending_tasks() if t.start_time is None]
+    if skipped:
+        st.warning(
+            "Didn't fit today: "
+            + ", ".join(f"**{t.title}** ({t.pet.name}, {t.duration} min)" for t in skipped)
+            + ". Free up more minutes or lower another task's priority."
+        )
+
+    saved = st.session_state.get("plan_reasons")
+    if saved and saved[0] == plan_day:
+        with st.expander("Why this plan?"):
+            for reason in saved[1]:
+                st.markdown(f"- {reason}")
+
+    pending = [t for t in scheduled if not t.is_done]
+    if pending:
+        with st.expander("Move a task to a fixed time"):
+            st.caption("For things like a vet appointment. Generating the schedule again will replace this.")
+            with st.form("reschedule"):
+                idx = st.selectbox(
+                    "Task",
+                    range(len(pending)),
+                    format_func=lambda i: f"{pending[i].title} ({pending[i].pet.name}, {pending[i].start_time:%H:%M})",
+                )
+                new_start = st.time_input("New start time", value=time(9, 0))
+                if st.form_submit_button("Move task"):
+                    pending[idx].reschedule(datetime.combine(plan_day, new_start))
+                    st.rerun()
