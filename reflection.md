@@ -92,12 +92,20 @@ Main objects needed for this system:
 **a. What you tested**
 
 - What behaviors did you test?
+
+    The suite has 33 tests covering six areas. Sorting: sort_by_time() returns tasks in time order, keeps the order tasks were added when two have the same time, puts unscheduled tasks last, and handles empty lists. Plan generation: generate_plan() puts higher priority first, puts the shorter task first when priorities tie, and skips a task that doesn't fit the budget while still scheduling later tasks that do. It also handles a task that exactly fills the remaining time, a zero budget, and tasks that are not due yet or are overdue. Recurring tasks: finishing a DAILY or WEEKLY task creates the next occurrence 1 or 7 days later at the same time. One-time tasks don't repeat, and marking a task done twice doesn't create a duplicate. I also tested finishing a task late and a date rolling over from Dec 31 to Jan 1. Conflict detection: tasks at the same time, overlaps between different pets, and one long task that overlaps several shorter ones are all flagged. Back-to-back tasks and tasks on other days are not. Replanning: building the plan again after finishing a task keeps the finished task in its slot and doesn't create overlaps. Filtering and validation: filtering by pet name and done status, rejecting a task or pet that already belongs to someone else, and rejecting invalid durations and negative budgets.
 - Why were these tests important?
+
+    These are the behaviors the whole app depends on. If sorting or priority order is wrong, the owner could get a plan where a medication is skipped for a grooming session. The edge cases mattered most because that's where small mistakes hide, like using `<=` instead of `<` when checking whether two tasks overlap. The tests also found a real bug. If I built the plan, marked the 8:00 walk done, and built the plan again, the next task was also placed at 8:00, because generate_plan() ignored the time slots already used by finished tasks. Running main.py by hand never showed this, because it only builds the plan once. After the fix, that test passes and protects against the bug coming back.
 
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
+
+    4 out of 5. All 33 tests pass, and they cover the main scheduling behavior and the edge cases most likely to break. I'm not at 5 because a few areas are still untested or need a design decision, and the Streamlit UI has no automated tests, so I've only checked it by hand.
 - What edge cases would you test next if you had more time?
+
+    First, plans that run past midnight, for example starting at 23:30 with a 60 minute task. get_scheduled_tasks() only looks at the date a task starts on, so a task that ends the next day may be missed or cause strange conflicts. Second, whether finished tasks should count against available_minutes when the plan is rebuilt. Right now a finished 30 minute walk doesn't reduce the budget, so I'd decide which behavior is right and test it. Third, finishing a recurring task early, before its due date, and leap-year dates like Feb 28/29. Finally, I'd add tests for the Streamlit app to make sure session_state keeps pets and tasks between page reruns.
 
 ---
 

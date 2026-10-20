@@ -253,10 +253,13 @@ class Scheduler:
            available_minutes a start_time right after the previous one.
            A task that doesn't fit is skipped, but keep checking the rest,
            since a shorter task later in the list may still fit.
+           Tasks already done today keep their slots, so a new task that
+           would overlap one is pushed to just after it.
         3. Clear self.reasons, then record why each task was kept or skipped.
         Return the scheduled tasks in time order.
         """
         pending = sorted(self.get_pending_tasks(), key=lambda t: (-t.priority, t.duration))
+        busy = [task for task in self.get_scheduled_tasks() if task.is_done]
         self.reasons = []
         current = datetime.combine(self.day, start)
         remaining = self.available_minutes
@@ -265,7 +268,7 @@ class Scheduler:
         for task in pending:
             label = f"'{task.title}' for {task.pet.name}"
             if task.duration <= remaining:
-                task.start_time = current
+                task.start_time = self._next_free_slot(current, task.duration, busy)
                 current = task.end_time()
                 remaining -= task.duration
                 plan.append(task)
@@ -281,6 +284,18 @@ class Scheduler:
                     f"{remaining} min left."
                 )
         return plan
+
+    @staticmethod
+    def _next_free_slot(start: datetime, minutes: int, busy: list[Task]) -> datetime:
+        """Return the earliest time at or after `start` where a task of
+        `minutes` overlaps none of the `busy` tasks (sorted by start_time).
+        """
+        for other in busy:
+            if start + timedelta(minutes=minutes) <= other.start_time:
+                break  # fits before this one, so before all later ones too
+            if start < other.end_time():
+                start = other.end_time()
+        return start
 
     def find_conflicts(self) -> list[tuple[Task, Task]]:
         """Return pairs of tasks on self.day whose time slots overlap.

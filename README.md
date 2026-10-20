@@ -77,19 +77,42 @@ Why this plan:
 
 ## 🧪 Testing PawPal+
 
-```bash
-# Run the full test suite:
-pytest
+Run the full test suite from the project root:
 
-# Run with coverage:
-pytest --cov
+```bash
+python -m pytest
 ```
+
+The tests in `tests/test_pawpal.py` cover the scheduling logic in `pawpal_system.py`:
+
+- **Sorting:** tasks come back in time order. Tasks with the same time keep the order they were added in, unscheduled tasks go last, and empty lists work.
+- **Plan generation:** higher priority goes first, with the shorter task first on a tie. A task that doesn't fit the time budget is skipped while later tasks can still fit. Also covers a task that exactly fills the budget, a zero budget, tasks not due yet, and tasks overdue.
+- **Recurring tasks:** finishing a daily or weekly task creates the next one 1 or 7 days later at the same time. Marking a task done twice doesn't duplicate it, and one-time tasks don't repeat. Also covers finishing a task late, rolling over from Dec 31 to Jan 1, and a recurring task with no pet.
+- **Conflict detection:** catches tasks at the same time and overlaps across different pets. Back-to-back tasks and tasks on other days are not flagged, and a long task that overlaps several later ones is reported against each of them.
+- **Replanning:** building the plan again after finishing tasks keeps finished tasks in their time slots. It fills the gaps around them without creating overlaps.
+- **Filtering and validation:** filtering by pet name and done status. Rejects tasks or pets that already belong to someone else, invalid durations, and negative budgets.
 
 Sample test output:
 
 ```
-# Paste your pytest output here
+============================= test session starts =============================
+platform win32 -- Python 3.13.15, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\nunez\Desktop\AI110\ai110-module2show-pawpal-starter
+plugins: anyio-4.15.1
+collected 33 items
+
+tests\test_pawpal.py .................................                   [100%]
+
+============================= 33 passed in 0.04s ==============================
 ```
+
+**Confidence Level: ★★★★☆ (4/5)**
+
+All 33 tests pass. They cover the main scheduling behavior and the edge cases most likely to break: ties, boundaries, budget limits, date rollover and replanning. Writing them also uncovered a real bug, overlapping time slots after replanning, which is now fixed. It's not 5 stars because a few cases are still untested or open design decisions:
+
+- Plans that run past midnight.
+- Whether finished tasks should count against the day's time budget when the plan is rebuilt.
+- The Streamlit UI, which has no automated tests.
 
 ## 📐 Smarter Scheduling
 
