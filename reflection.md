@@ -48,12 +48,20 @@ Main objects needed for this system:
 **a. Constraints and priorities**
 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
+
+    The scheduler considers 4 constraints. Time: the owner sets available_minutes for the day, and generate_plan() only schedules tasks that still fit in what's left of that budget. Priority: every task is LOW, MEDIUM, or HIGH, and higher priority tasks are placed first, with shorter tasks first when priorities tie. Due dates and recurrence: only tasks that are due that day are planned, so completed tasks are left out, and a DAILY or WEEKLY task that is marked done creates its next occurrence for tomorrow or next week instead of showing up again today. Time conflicts: since the owner can't do two things at once, conflict_warnings() flags any tasks whose time slots overlap, whether they are for the same pet or different pets.
 - How did you decide which constraints mattered most?
+
+    I ranked them by what would hurt a pet the most if it went wrong. Priority matters most because missing a feeding or a medication is much worse than skipping a grooming session, so the scheduler always places HIGH tasks first. Time comes next because a plan that doesn't fit into the owner's actual day isn't useful, which is why tasks that don't fit are skipped and explained instead of squeezed in. Due dates keep the plan focused on what actually needs doing today, and conflicts are reported as warnings instead of errors so the owner stays in control and can decide how to fix them. 
 
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
+
+    generate_plan() uses a greedy approach instead of searching for the best possible combination of tasks. It sorts pending tasks by priority (highest first, shorter task first on ties) and walks the list once, scheduling each task that still fits in the remaining available_minutes. This means it doesn't always use the time budget as well as it could. For example, with 60 minutes left, one 50 minute HIGH task is scheduled first and then two 30 minute MEDIUM tasks no longer fit, even though some owners might prefer getting both MEDIUM tasks done. A "knapsack" style algorithm could find the combination with the most total value, but it's more complex to write, test, and explain.
 - Why is that tradeoff reasonable for this scenario?
+
+    For a pet owner, the most important tasks (feeding, medication, walks) should always come first, even if that leaves a few minutes unused. The greedy approach guarantees that a HIGH priority task is never dropped to make room for lower priority ones, which matches how a real owner would think about their day. It's also easy to explain: every decision is recorded in explain_plan(), so the owner can see exactly why a task was scheduled or skipped. With only around 10-20 tasks a day, the small amount of time it might waste matters much less than having a plan that is predictable and easy to understand.
 
 ---
 
